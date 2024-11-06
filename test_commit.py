@@ -1,29 +1,29 @@
 import streamlit as st
 
-# User is not initially logged in
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-
-# User is not initially a new user
-if "new_user" not in st.session_state:
-    st.session_state["new_user"] = False
-
-if "username" not in st.session_state:
-    st.session_state["username"] = ""
-
-if "tasks" not in st.session_state:
-    st.session_state["tasks"] = []
-
-if "edit_task" not in st.session_state:
-    st.session_state["edit_task"] = False  # Initialize flag for editing a task
-
-
 # Task Class to hold task data
 class Task:
     def __init__(self, name, description, frequency):
         self.name = name
         self.description = description
         self.frequency = frequency
+
+# UserSettings Class to hold user data
+class UserSettings:
+    def __init__(self, first_name="", difficulty_level="Beginner"):
+        self.first_name = first_name
+        self.difficulty_level = difficulty_level
+
+# Initialize session state variables if not already set
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+if "new_user" not in st.session_state:
+    st.session_state["new_user"] = False
+if "username" not in st.session_state:
+    st.session_state["username"] = ""
+if "user_settings" not in st.session_state:
+    st.session_state["user_settings"] = UserSettings()  # Default UserSettings object
+if "tasks" not in st.session_state:
+    st.session_state["tasks"] = []
 
 # Welcome Page function
 def welcome_page():
@@ -32,9 +32,13 @@ def welcome_page():
     st.text_input("Username: ", key="username")
     st.text_input("Password: ", type="password")
     
-    if st.button("Create Account"):
+    if st.button("Login"):
+        st.session_state["logged_in"] = True
+        st.rerun()
+
+    if st.button("New User? Create Account"):
         st.session_state["new_user"] = True
-        st.rerun()  # Forces the app to rerun and update the page
+        st.rerun()
     
     st.write("Keep track of your practice!")
     st.write("Create tasks you hope to accomplish")
@@ -45,15 +49,59 @@ def new_user_welcome():
     st.text_input("Enter a username: ", key="new_username")
     st.text_input("Enter a Password: ", type="password")
 
+    user_settings = st.session_state["user_settings"]
+
+    difficulty_level_input = st.selectbox(
+    "Select Difficulty Level:", 
+    ["Beginner", "Intermediate", "Advanced"], 
+    index=["Beginner", "Intermediate", "Advanced"].index(user_settings.difficulty_level))
+    user_settings.difficulty_level = difficulty_level_input
+
     if st.button("Create Account"):
-        # Simulate account creation
         if st.session_state["first_name"] and st.session_state["new_username"]:
+            # Create UserSettings object and save it in session state
+            st.session_state["user_settings"] = UserSettings(
+                first_name=st.session_state["first_name"], 
+                difficulty_level= difficulty_level_input # Default difficulty level
+            )
+            st.session_state["username"] = st.session_state["new_username"]
             st.session_state["logged_in"] = True
             st.success("Account created!")
-            st.rerun()  # Forces the app to rerun and update the page
+            st.rerun()
         else:
             st.error("Please fill in all fields.")
     
+    
+
+# User Settings Page
+def user_settings_page():
+    st.title("User Settings")
+    
+    # Access the UserSettings object
+    user_settings = st.session_state["user_settings"]
+
+    # Display and edit the user's first name and difficulty level
+    first_name_input = st.text_input("Edit First Name:", value=user_settings.first_name)
+    difficulty_level_input = st.selectbox(
+        "Select Difficulty Level:", 
+        ["Beginner", "Intermediate", "Advanced"], 
+        index=["Beginner", "Intermediate", "Advanced"].index(user_settings.difficulty_level)
+    )
+
+    if st.button("Save Changes"):
+        # Update UserSettings object in session state
+        user_settings.first_name = first_name_input
+        user_settings.difficulty_level = difficulty_level_input
+        st.success("Settings updated successfully!")
+        st.session_state["user_settings"] = user_settings  # Save updated settings back to session state
+        st.session_state["user_settings_page"] = False  # Redirect back to tasks
+        st.rerun()
+
+    if st.button("Back to Tasks"):
+        st.session_state["user_settings_page"] = False  # Redirect back to tasks
+        st.rerun()
+
+# Task Management (Add, Edit, Delete)
 def tasks():
     st.title("Tasks:")
 
@@ -62,14 +110,18 @@ def tasks():
             st.write(f"**{task.name}**: {task.description} (Frequency: {task.frequency})")
     else:
         st.write("Welcome to the tasks page!")
-        st.write("To add a task, click the 'Add a Task' button!")
-        st.write("To edit a task, click the 'Edit a Task' button!")
+        st.write("To add a task, click the 'Add a Task button!'")
+        st.write("To edit a task, click the 'Edit a Task button!'")
         st.write("To change your preferred settings, click 'User Settings'")
-    
+
     if st.button("Edit a Task"):
-        st.session_state["edit_task"] = True  # Set flag to true when editing task
-        st.rerun()  # Rerun to show edit task form
-    
+        st.session_state["edit_task"] = True
+        st.rerun()
+
+    if st.button("User Settings"):
+        st.session_state["user_settings_page"] = True
+        st.rerun()
+
     if st.button("Add a Task"):
         st.session_state["add_task"] = True
         st.rerun()
@@ -82,13 +134,10 @@ def add_task():
 
     if st.button("Confirm Changes"):
         if task_name and task_description:
-            # Create task object and add it to the session state
             new_task = Task(task_name, task_description, frequency)
             st.session_state["tasks"].append(new_task)
             st.session_state["add_task"] = False
             st.success(f"Task '{task_name}' added successfully!")
-            st.write(f"Description: {task_description}")
-            st.write(f"Frequency: {frequency}")
             st.rerun()
         else:
             st.error("Please fill in both task name and description.")
@@ -110,31 +159,57 @@ def edit_task_page():
         task_description_input = st.text_area("Task Description:", selected_task.description)
         frequency_input = st.selectbox("Task Frequency:", ["One-Time", "Daily", "Weekly"], index=["One-Time", "Daily", "Weekly"].index(selected_task.frequency))
 
-        if st.button("Confirm Changes"):
-            if task_name_input and task_description_input:
-                # Update task object with new details
-                selected_task.name = task_name_input
-                selected_task.description = task_description_input
-                selected_task.frequency = frequency_input
+    if st.button("Confirm Changes"):
+        if task_name_input and task_description_input:
+            selected_task.name = task_name_input
+            selected_task.description = task_description_input
+            selected_task.frequency = frequency_input
 
-                st.success(f"Task '{task_name_input}' updated successfully!")
-                st.session_state["edit_task"] = False  # Reset edit task flag
-                st.rerun()  # Rerun to show tasks page again
-            else:
-                st.error("Please fill in both task name and description.")
-        
-        if st.button("Cancel"):
-            st.session_state["edit_task"] = False
-            st.rerun()  # Return to tasks page
+            st.success(f"Task '{task_name_input}' updated successfully!")
+            st.session_state["edit_task"] = False  # Reset edit task flag
+            st.rerun()
+        else:
+            st.error("Please fill in both task name and description.")
+    
+    if st.button("Cancel"):
+        st.session_state["edit_task"] = False
+        st.rerun()
 
-# Call the function to display the page based on user flow
-if st.session_state.get("edit_task", False):
-    edit_task_page()  # Show the edit task page if user is editing
+    # Delete task button
+    if st.button("Delete Task"):
+        st.session_state["delete_task"] = True
+        st.session_state["task_to_delete"] = selected_task
+        st.rerun()
+
+def confirm_delete_task():
+    st.warning(f"Are you sure you want to delete the task '{st.session_state['task_to_delete'].name}'? Removing this task cannot be undone and it will no longer appear in your 'Tasks' page.")
+
+    if st.button("Delete"):
+        # Delete the task from the session state
+        task_to_delete = st.session_state["task_to_delete"]
+        st.session_state["tasks"] = [task for task in st.session_state["tasks"] if task != task_to_delete]
+        st.session_state["delete_task"] = False  # Exit delete confirmation
+        st.success(f"Task '{task_to_delete.name}' deleted successfully!")
+        st.session_state["edit_task"] = False
+        st.rerun()  # Refresh the task list
+    
+    if st.button("Keep"):
+        # If the user cancels, return to the edit task page
+        st.session_state["delete_task"] = False
+        st.rerun()  # Refresh the task list to go back to the edit page    
+
+# Call the appropriate page based on user flow
+if st.session_state.get("user_settings_page", False):
+    user_settings_page()
+elif st.session_state.get("delete_task", False):
+    confirm_delete_task()
+elif st.session_state.get("edit_task", False):
+    edit_task_page()
 elif st.session_state.get("add_task", False):
-    add_task()  # Show add task page
+    add_task()
 elif st.session_state["logged_in"]:
-    tasks()  # Show tasks if logged in
+    tasks()
 elif st.session_state["new_user"]:
-    new_user_welcome()  # Show new user page
+    new_user_welcome()
 else:
-    welcome_page()  # Show welcome page
+    welcome_page()
